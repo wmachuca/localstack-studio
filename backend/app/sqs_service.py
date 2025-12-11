@@ -23,10 +23,10 @@ class SQSService:
 
     def list_queues(self) -> List[Dict[str, str]]:
         """
-        List all available SQS queues
+        List all available SQS queues, sorted by creation timestamp
 
         Returns:
-            List of queue information dictionaries
+            List of queue information dictionaries, ordered by creation date
         """
         try:
             response = self.client.list_queues()
@@ -35,10 +35,26 @@ class SQSService:
             queues = []
             for url in queue_urls:
                 queue_name = url.split("/")[-1]
+
+                # Get queue attributes to fetch creation timestamp
+                try:
+                    attrs_response = self.client.get_queue_attributes(
+                        QueueUrl=url,
+                        AttributeNames=["CreatedTimestamp"]
+                    )
+                    created_timestamp = attrs_response.get("Attributes", {}).get("CreatedTimestamp", "0")
+                except ClientError:
+                    # If we can't get attributes, use 0 as fallback
+                    created_timestamp = "0"
+
                 queues.append({
                     "name": queue_name,
-                    "url": url
+                    "url": url,
+                    "createdTimestamp": created_timestamp
                 })
+
+            # Sort by creation timestamp (ascending - oldest first)
+            queues.sort(key=lambda q: int(q["createdTimestamp"]))
 
             return queues
         except ClientError as e:
@@ -141,3 +157,67 @@ class SQSService:
         except ClientError as e:
             print(f"Error receiving messages from {queue_name}: {e}")
             return []
+
+    def send_message(
+        self,
+        queue_name: str,
+        message_body: str,
+        message_attributes: Dict[str, Any] = None,
+        delay_seconds: int = 0
+    ) -> Dict[str, Any]:
+        """
+        Send a message to a queue
+
+        Args:
+            queue_name: Name of the queue
+            message_body: Message body (string or JSON)
+            message_attributes: Optional message attributes
+            delay_seconds: Delay before message becomes available (0-900)
+
+        Returns:
+            Dictionary with message ID and other metadata
+        """
+        try:
+            queue_url = self.get_queue_url(queue_name)
+
+            params = {
+                "QueueUrl": queue_url,
+                "MessageBody": message_body,
+                "DelaySeconds": delay_seconds
+            }
+
+            if message_attributes:
+                params["MessageAttributes"] = message_attributes
+
+            response = self.client.send_message(**params)
+
+            return {
+                "messageId": response.get("MessageId"),
+                "md5OfMessageBody": response.get("MD5OfMessageBody"),
+                "sequenceNumber": response.get("SequenceNumber"),
+            }
+        except ClientError as e:
+            print(f"Error sending message to {queue_name}: {e}")
+            raise
+
+    def delete_message(self, queue_name: str, receipt_handle: str) -> bool:
+        """
+        Delete a message from a queue
+
+        Args:
+            queue_name: Name of the queue
+            receipt_handle: Receipt handle of the message to delete
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            queue_url = self.get_queue_url(queue_name)
+            self.client.delete_message(
+                QueueUrl=queue_url,
+                ReceiptHandle=receipt_handle
+            )
+            return True
+        except ClientError as e:
+            print(f"Error deleting message from {queue_name}: {e}")
+            raise

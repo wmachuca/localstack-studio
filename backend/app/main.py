@@ -1,9 +1,11 @@
 """FastAPI Backend for LocalStack Studio"""
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 from app.sqs_service import SQSService
 from app.websocket_manager import manager
 import logging
+from typing import Optional, Dict, Any
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -27,6 +29,19 @@ app.add_middleware(
 
 # Initialize SQS service
 sqs_service = SQSService()
+
+
+# Pydantic models for request/response
+class SendMessageRequest(BaseModel):
+    """Request model for sending a message"""
+    message_body: str
+    message_attributes: Optional[Dict[str, Any]] = None
+    delay_seconds: int = 0
+
+
+class DeleteMessageRequest(BaseModel):
+    """Request model for deleting a message"""
+    receipt_handle: str
 
 
 @app.get("/")
@@ -75,6 +90,60 @@ async def get_queue_info(queue_name: str):
     except Exception as e:
         logger.error(f"Error getting queue info for {queue_name}: {e}")
         raise HTTPException(status_code=404, detail=f"Queue {queue_name} not found")
+
+
+@app.post("/queue/{queue_name}/message")
+async def send_message(queue_name: str, request: SendMessageRequest):
+    """
+    Send a message to a specific queue
+
+    Args:
+        queue_name: Name of the queue
+        request: SendMessageRequest with message details
+
+    Returns:
+        Message ID and metadata
+    """
+    try:
+        result = sqs_service.send_message(
+            queue_name=queue_name,
+            message_body=request.message_body,
+            message_attributes=request.message_attributes,
+            delay_seconds=request.delay_seconds
+        )
+        logger.info(f"Message sent to {queue_name}: {result['messageId']}")
+        return {
+            "success": True,
+            "messageId": result["messageId"],
+            "md5OfMessageBody": result["md5OfMessageBody"]
+        }
+    except Exception as e:
+        logger.error(f"Error sending message to {queue_name}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/queue/{queue_name}/message")
+async def delete_message(queue_name: str, request: DeleteMessageRequest):
+    """
+    Delete a message from a specific queue
+
+    Args:
+        queue_name: Name of the queue
+        request: DeleteMessageRequest with receipt handle
+
+    Returns:
+        Success status
+    """
+    try:
+        sqs_service.delete_message(
+            queue_name=queue_name,
+            receipt_handle=request.receipt_handle
+        )
+        logger.info(f"Message deleted from {queue_name}")
+        return {"success": True, "message": "Message deleted successfully"}
+    except Exception as e:
+        logger.error(f"Error deleting message from {queue_name}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.websocket("/ws/messages/{queue_name}")
