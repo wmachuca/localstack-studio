@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  # LocalStack - AWS services emulator
+  localstack:
+    image: localstack/localstack:4.11
+    container_name: localstack-studio-localstack
+    ports:
+      - "4566:4566"
+      - "4510-4559:4510-4559"
+    environment:
+      - SERVICES=sqs
+      - DEBUG=1
+      - DATA_DIR=/tmp/localstack/data
+      - DOCKER_HOST=unix:///var/run/docker.sock
+    volumes:
+      - "${LOCALSTACK_VOLUME_DIR:-./localstack-data}:/var/lib/localstack"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    networks:
+      - localstack-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend - FastAPI + WebSockets
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: localstack-studio-backend
+    ports:
+      - "8000:8000"
+    environment:
+      # Use SQS_ENDPOINT env var to connect to external LocalStack
+      # Example: SQS_ENDPOINT=http://host.docker.internal:4566 docker-compose up backend frontend
+      - SQS_ENDPOINT=${SQS_ENDPOINT:-http://localstack:4566}
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-test}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-test}
+    depends_on:
+      localstack:
+        condition: service_healthy
+    networks:
+      - localstack-network
+    restart: unless-stopped
+
+  # Frontend - React + Vite + Nginx
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: localstack-studio-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_BACKEND_URL=http://localhost:8000
+    depends_on:
+      - backend
+    networks:
+      - localstack-network
+    restart: unless-stopped
+
+networks:
+  localstack-network:
+    name: ${LOCALSTACK_NETWORK_NAME:-localstack-network}
+    driver: bridge
+
+volumes:
+  localstack-data:

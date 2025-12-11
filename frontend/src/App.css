@@ -1,0 +1,145 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.app {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #f5f5f5;
+}
+
+.app-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 1.5rem 2rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  z-index: 10;
+}
+
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.header-main h1 {
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 600;
+}
+
+.header-main p {
+  margin: 0.25rem 0 0;
+  opacity: 0.9;
+  font-size: 0.875rem;
+}
+
+.current-service-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(10px);
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.service-icon-small {
+  font-size: 1.25rem;
+}
+
+.service-name-small {
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: white;
+}
+
+.app-content {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.service-sidebar {
+  width: 280px;
+  background: white;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.05);
+  flex-shrink: 0;
+  z-index: 5;
+}
+
+.main-content {
+  flex: 1;
+  overflow: hidden;
+  background: #f5f5f5;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .service-sidebar {
+    width: 240px;
+  }
+}
+
+@media (max-width: 768px) {
+  .app-header {
+    padding: 1rem 1.5rem;
+  }
+
+  .header-content {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .header-main h1 {
+    font-size: 1.5rem;
+  }
+
+  .header-main p {
+    font-size: 0.8rem;
+  }
+
+  .current-service-badge {
+    align-self: flex-end;
+  }
+
+  .app-content {
+    flex-direction: column;
+  }
+
+  .service-sidebar {
+    width: 100%;
+    max-height: 30vh;
+    overflow-y: auto;
+  }
+}
+
+@media (max-width: 480px) {
+  .app-header {
+    padding: 1rem;
+  }
+
+  .header-main h1 {
+    font-size: 1.25rem;
+  }
+
+  .service-icon-small {
+    font-size: 1rem;
+  }
+
+  .service-name-small {
+    font-size: 0.75rem;
+  }
+}

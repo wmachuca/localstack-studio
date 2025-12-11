@@ -1,0 +1,55 @@
+# Docker Compose configuration for connecting to an existing LocalStack container
+# Use this when you already have LocalStack running in another Docker network
+#
+# Usage:
+#   1. Set environment variables in .env:
+#      - LOCALSTACK_NETWORK_NAME=your-network-name
+#      - LOCALSTACK_CONTAINER_NAME=your-localstack-container
+#      - SQS_ENDPOINT=http://your-localstack-container:4566
+#
+#   2. Run with:
+#      docker-compose -f docker-compose.external-localstack.yml up -d
+#      OR use: make up-external-localstack
+
+version: '3.8'
+
+services:
+  # Backend - FastAPI + WebSockets
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: localstack-studio-backend
+    ports:
+      - "8000:8000"
+    environment:
+      # Connect to external LocalStack container
+      - SQS_ENDPOINT=${SQS_ENDPOINT:-http://${LOCALSTACK_CONTAINER_NAME:-localstack}:4566}
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-test}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-test}
+    networks:
+      - external-localstack-network
+    restart: unless-stopped
+
+  # Frontend - React + Vite + Nginx
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: localstack-studio-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_BACKEND_URL=http://localhost:8000
+    depends_on:
+      - backend
+    networks:
+      - external-localstack-network
+    restart: unless-stopped
+
+networks:
+  external-localstack-network:
+    # This connects to an existing Docker network where LocalStack is running
+    external: true
+    name: ${LOCALSTACK_NETWORK_NAME}

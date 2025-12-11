@@ -1,0 +1,29 @@
+.sqs-service {
+  display: flex;
+  height: 100%;
+  overflow: hidden;
+}
+
+.sqs-sidebar {
+  width: 320px;
+  background: white;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.05);
+  flex-shrink: 0;
+}
+
+.sqs-main {
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .sqs-service {
+    flex-direction: column;
+  }
+
+  .sqs-sidebar {
+    width: 100%;
+    max-height: 40vh;
+  }
+}
