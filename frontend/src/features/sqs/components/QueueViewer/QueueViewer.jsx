@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
-import { useQueueMessages } from './useQueueMessages';
-import { SendMessageModal } from './SendMessageModal';
+import { useApp } from '../../../../context/AppContext';
+import { useQueueMessages } from '../../hooks/useQueueMessages';
+import { SendMessageModal } from '../SendMessageModal';
 import './QueueViewer.css';
 
 /**
  * Component to display messages from a specific queue in real-time
  */
-export const QueueViewer = ({ queueName, backendUrl = 'http://localhost:8000' }) => {
-  const wsUrl = backendUrl.replace('http://', 'ws://').replace('https://', 'wss://');
+export const QueueViewer = ({ queueName }) => {
+  const { backendUrl, wsUrl } = useApp();
   const [sortOrder, setSortOrder] = useState('oldest-first'); // 'oldest-first' or 'newest-first'
   const { messages, isConnected, isLoading, error, clearMessages } = useQueueMessages(queueName, wsUrl, sortOrder);
   const [expandedMessage, setExpandedMessage] = useState(null);
@@ -119,7 +120,6 @@ export const QueueViewer = ({ queueName, backendUrl = 'http://localhost:8000' })
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         queueName={queueName}
-        backendUrl={backendUrl}
       />
 
       {error && (

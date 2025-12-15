@@ -1,6 +1,6 @@
 # LocalStack Studio
 
-A modern web-based monitoring tool for visualizing and interacting with AWS SQS queues running on [LocalStack](https://localstack.cloud/). Features real-time message streaming via WebSockets with a clean, responsive interface.
+A modern web-based management tool for visualizing and interacting with AWS services running on [LocalStack](https://localstack.cloud/). Features real-time SQS message streaming via WebSockets and comprehensive DynamoDB table management with a clean, responsive interface.
 
 **Compatible with LocalStack v4.11+** | [LocalStack GitHub Repository](https://github.com/localstack/localstack)
 
@@ -12,41 +12,79 @@ A modern web-based monitoring tool for visualizing and interacting with AWS SQS 
 
 - **Multi-Service Support**: Navigate between different AWS services with an intuitive service menu
 - **Real-time SQS Monitoring**: Monitor SQS queues with live updates via WebSockets
-- **Non-destructive Reading**: Messages are read using long polling without deletion
+- **DynamoDB Management**: Full CRUD operations on DynamoDB tables with scan and pagination
+- **Non-destructive SQS Reading**: Messages are read using long polling without deletion
 - **Modern UI**: Clean, responsive interface built with React and Vite
 - **Easy Setup**: Fully containerized with Docker Compose
 - **CLI Tool**: Publish messages to queues from the command line
-- **Extensible Architecture**: Modular design makes it easy to add new AWS services
+- **Extensible Architecture**: Modular, feature-based design makes it easy to add new AWS services
 
 ### Currently Supported Services
 
-- ✅ **SQS (Simple Queue Service)** - Real-time message streaming and monitoring
-- 🚧 **S3, DynamoDB, Lambda, SNS, Kinesis, EventBridge, Step Functions** - Coming soon
+- ✅ **SQS (Simple Queue Service)** - Real-time message streaming, send/delete messages
+- ✅ **DynamoDB** - List tables, view items, create/edit/delete items, scan with pagination
+- 🚧 **S3, Lambda, SNS, Kinesis, EventBridge, Step Functions** - Coming soon
 
 Want to add a new service? Check out [ADDING_SERVICES.md](ADDING_SERVICES.md)!
 
 ## Architecture
 
+### System Overview
+
 ```
 ┌─────────────────┐
 │  Frontend       │  React + Vite
-│  (Port 3000)    │  Real-time UI with WebSocket client
+│  (Port 3000)    │  Context API + Custom Hooks
 └────────┬────────┘
          │
          │ HTTP/WebSocket
          ▼
 ┌─────────────────┐
-│  Backend        │  FastAPI + WebSockets
-│  (Port 8000)    │  REST API + Real-time streaming
+│  Backend        │  FastAPI (Modular Architecture)
+│  (Port 8000)    │  Routers + Services + Models
 └────────┬────────┘
          │
          │ AWS SDK (boto3)
          ▼
 ┌─────────────────┐
 │  LocalStack     │  AWS Service Emulator
-│  (Port 4566)    │  SQS (+ future services)
+│  (Port 4566)    │  SQS + DynamoDB + More
 └─────────────────┘
 ```
+
+### Frontend Architecture
+
+The frontend uses a **feature-based organization** with React Context API and custom hooks:
+
+```
+- Context API (AppContext) → Global state management
+- Custom Hooks (useApi, usePoll) → Reusable logic
+- Feature Modules (features/sqs, features/dynamodb) → Self-contained service UIs
+- Shared Components (ServiceMenu, ComingSoon) → Cross-feature components
+```
+
+**Benefits:**
+- No props drilling (Context API)
+- Reusable API patterns (custom hooks)
+- Clear separation by service (feature modules)
+- Easy to add new services
+
+### Backend Architecture
+
+The backend follows a **modular FastAPI pattern** with clear separation of concerns:
+
+```
+- Routers → HTTP endpoints and request/response handling
+- Services → Business logic and AWS SDK interactions
+- Models → Request/response validation (Pydantic)
+- WebSocket Manager → Real-time message streaming
+```
+
+**Benefits:**
+- Clean separation of concerns
+- Easy to test individual components
+- Scalable for adding new services
+- Standard FastAPI best practices
 
 ## Quick Start
 
@@ -88,6 +126,7 @@ If you have LocalStack running locally or via Docker Desktop (accessible via `lo
 cp .env.example .env
 # Edit .env and set:
 # SQS_ENDPOINT=http://host.docker.internal:4566
+# DYNAMODB_ENDPOINT=http://host.docker.internal:4566
 ```
 
 2. Start only backend and frontend:
@@ -99,7 +138,7 @@ make up-no-localstack
 - Frontend: http://localhost:3000
 - Backend API: http://localhost:8000
 
-**Note:** Make sure your external LocalStack instance has SQS service enabled.
+**Note:** Make sure your external LocalStack instance has SQS and DynamoDB services enabled.
 
 #### Option 3: Connecting to LocalStack in Another Docker Network
 
@@ -124,6 +163,7 @@ Edit `.env` and set:
 LOCALSTACK_NETWORK_NAME=your-network-name    # e.g., myproject_default
 LOCALSTACK_CONTAINER_NAME=your-container-name # e.g., localstack-main
 SQS_ENDPOINT=http://your-container-name:4566
+DYNAMODB_ENDPOINT=http://your-container-name:4566
 ```
 
 3. Start backend and frontend connected to the external network:
@@ -141,11 +181,16 @@ make up-external-localstack
 LOCALSTACK_NETWORK_NAME=myapp_default
 LOCALSTACK_CONTAINER_NAME=localstack
 SQS_ENDPOINT=http://localstack:4566
+DYNAMODB_ENDPOINT=http://localstack:4566
 ```
 
 ---
 
-4. Create a test queue and send messages:
+### Testing the Application
+
+#### SQS (Simple Queue Service)
+
+1. Create a test queue and send messages:
 ```bash
 # Install CLI dependencies
 cd scripts
@@ -153,46 +198,113 @@ pip install -r requirements.txt
 
 # Create a queue and send a message
 python publish_message.py test-queue '{"message": "Hello World"}' --create-queue
+
+# Send more messages
+python publish_message.py test-queue '{"user": "alice", "action": "login"}'
+python publish_message.py test-queue '{"event": "test"}' --delay 5
 ```
 
-5. Open the frontend in your browser and select the queue to see real-time messages!
+2. Open http://localhost:3000 in your browser
+3. Select **SQS** from the service menu
+4. Click on `test-queue` to see real-time messages!
+
+#### DynamoDB
+
+1. Create a test table with items:
+```bash
+# Create table
+aws dynamodb create-table \
+  --endpoint-url http://localhost:4566 \
+  --table-name users \
+  --key-schema AttributeName=userId,KeyType=HASH \
+  --attribute-definitions AttributeName=userId,AttributeType=S \
+  --billing-mode PAY_PER_REQUEST \
+  --region us-east-1
+
+# Add items
+aws dynamodb put-item \
+  --endpoint-url http://localhost:4566 \
+  --table-name users \
+  --item '{"userId": {"S": "user1"}, "name": {"S": "Alice"}, "email": {"S": "alice@example.com"}}' \
+  --region us-east-1
+```
+
+2. Open http://localhost:3000 in your browser
+3. Select **DynamoDB** from the service menu
+4. Click on `users` table to view items
+5. Try the features:
+   - **Scan items** with configurable limits (25/50/100/500)
+   - **Add new items** with the "+ Add Item" button
+   - **Edit items** by clicking the ✏️ icon
+   - **Delete items** by clicking the 🗑️ icon
+   - **Load more** for pagination
 
 ## Project Structure
 
 ```
 localstack-studio/
-├── backend/                 # FastAPI backend
+├── backend/                    # FastAPI backend
 │   ├── app/
-│   │   ├── main.py         # FastAPI application
-│   │   ├── sqs_service.py  # SQS client wrapper
-│   │   └── websocket_manager.py  # WebSocket handling
+│   │   ├── main.py            # FastAPI app configuration + router registration
+│   │   ├── core/
+│   │   │   └── config.py      # Environment configuration
+│   │   ├── models/            # Pydantic models for request/response
+│   │   │   ├── sqs.py
+│   │   │   └── dynamodb.py
+│   │   ├── services/          # Business logic and AWS SDK interactions
+│   │   │   ├── sqs_service.py
+│   │   │   └── dynamodb_service.py
+│   │   ├── routers/           # HTTP endpoints
+│   │   │   ├── sqs.py
+│   │   │   └── dynamodb.py
+│   │   └── websocket/
+│   │       └── manager.py     # WebSocket handling for real-time updates
 │   ├── Dockerfile
 │   └── requirements.txt
 │
-├── frontend/               # React frontend
+├── frontend/                  # React frontend
 │   ├── src/
-│   │   ├── components/
-│   │   │   ├── ServiceMenu.jsx     # Service navigation menu
-│   │   │   ├── SQSService.jsx      # SQS service container
-│   │   │   ├── QueueList.jsx       # Queue selection sidebar
-│   │   │   ├── QueueViewer.jsx     # Message viewer
-│   │   │   ├── ComingSoon.jsx      # Placeholder for future services
-│   │   │   └── useQueueMessages.js # WebSocket hook
+│   │   ├── context/           # Global state management
+│   │   │   └── AppContext.jsx # Backend URL, WebSocket URL
+│   │   ├── hooks/             # Reusable custom hooks
+│   │   │   ├── useApi.js      # API calls with loading/error states
+│   │   │   └── usePoll.js     # Auto-refresh functionality
+│   │   ├── components/        # Shared components
+│   │   │   ├── ServiceMenu.jsx
+│   │   │   └── ComingSoon.jsx
+│   │   ├── features/          # Feature-based modules
+│   │   │   ├── sqs/          # SQS module
+│   │   │   │   ├── SQSService.jsx
+│   │   │   │   ├── components/
+│   │   │   │   │   ├── QueueList/
+│   │   │   │   │   ├── QueueViewer/
+│   │   │   │   │   └── SendMessageModal/
+│   │   │   │   ├── hooks/
+│   │   │   │   │   └── useQueueMessages.js
+│   │   │   │   └── index.js
+│   │   │   └── dynamodb/     # DynamoDB module
+│   │   │       ├── DynamoDBService.jsx
+│   │   │       ├── components/
+│   │   │       │   ├── TableList/
+│   │   │       │   ├── ItemViewer/
+│   │   │       │   └── ItemEditor/
+│   │   │       └── index.js
 │   │   ├── App.jsx
 │   │   └── main.jsx
 │   ├── Dockerfile
 │   ├── nginx.conf
 │   └── package.json
 │
-├── scripts/               # CLI tools
-│   ├── publish_message.py # Message publisher
+├── scripts/                   # CLI tools
+│   ├── publish_message.py    # Message publisher
 │   └── requirements.txt
 │
-├── docker-compose.yml              # Service orchestration
+├── docker-compose.yml                      # Full stack orchestration
 ├── docker-compose.external-localstack.yml  # External LocalStack config
-├── Makefile                        # Development commands
-├── ADDING_SERVICES.md              # Guide for adding new services
-├── LICENSE                         # Apache 2.0
+├── Makefile                                # Development commands
+├── CONTRIBUTING.md                         # Contribution guidelines
+├── QUICKSTART.md                           # Quick start guide
+├── LICENSE                                 # Apache 2.0
 └── README.md
 ```
 
@@ -200,15 +312,103 @@ localstack-studio/
 
 ### Backend Endpoints
 
-#### REST API
+#### SQS Endpoints
 
-- `GET /` - Health check
 - `GET /queues` - List all SQS queues
+  ```json
+  {
+    "queues": [
+      {
+        "name": "test-queue",
+        "url": "http://localhost:4566/000000000000/test-queue",
+        "attributes": {...}
+      }
+    ]
+  }
+  ```
+
 - `GET /queue/{queue_name}` - Get queue details and attributes
+- `POST /queue/{queue_name}/message` - Send message to queue
+  ```json
+  {
+    "message_body": "{\"key\": \"value\"}",
+    "delay_seconds": 0
+  }
+  ```
+
+- `DELETE /queue/{queue_name}/message` - Delete message from queue
+  ```json
+  {
+    "receipt_handle": "abc123..."
+  }
+  ```
+
+#### DynamoDB Endpoints
+
+- `GET /dynamodb/tables` - List all DynamoDB tables
+  ```json
+  {
+    "tables": [
+      {
+        "name": "users",
+        "itemCount": 3,
+        "sizeBytes": 161,
+        "status": "ACTIVE",
+        "creationDateTime": "2025-12-13T21:47:35"
+      }
+    ],
+    "count": 1
+  }
+  ```
+
+- `GET /dynamodb/tables/{table_name}` - Describe table schema
+  ```json
+  {
+    "name": "users",
+    "status": "ACTIVE",
+    "itemCount": 3,
+    "keySchema": [
+      {"attributeName": "userId", "keyType": "HASH"}
+    ],
+    "attributeDefinitions": [
+      {"attributeName": "userId", "attributeType": "S"}
+    ]
+  }
+  ```
+
+- `POST /dynamodb/tables/{table_name}/scan` - Scan table items with pagination
+  ```json
+  {
+    "limit": 50,
+    "exclusive_start_key": null
+  }
+  ```
+
+- `POST /dynamodb/tables/{table_name}/query` - Query table items (coming soon)
+- `GET /dynamodb/tables/{table_name}/items` - Get single item
+- `POST /dynamodb/tables/{table_name}/items` - Create/update item
+  ```json
+  {
+    "item": {
+      "userId": "user1",
+      "name": "Alice",
+      "email": "alice@example.com"
+    }
+  }
+  ```
+
+- `DELETE /dynamodb/tables/{table_name}/items` - Delete item
+  ```json
+  {
+    "key": {
+      "userId": "user1"
+    }
+  }
+  ```
 
 #### WebSocket
 
-- `WS /ws/messages/{queue_name}` - Real-time message stream
+- `WS /ws/messages/{queue_name}` - Real-time SQS message stream
 
 Example WebSocket message:
 ```json
@@ -223,6 +423,12 @@ Example WebSocket message:
   }
 }
 ```
+
+### Interactive API Documentation
+
+Once the backend is running, visit:
+- Swagger UI: http://localhost:8000/docs
+- ReDoc: http://localhost:8000/redoc
 
 ## CLI Usage
 
@@ -261,6 +467,7 @@ pip install -r requirements.txt
 
 # Run development server
 export SQS_ENDPOINT=http://localhost:4566
+export DYNAMODB_ENDPOINT=http://localhost:4566
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
@@ -294,6 +501,7 @@ cp .env.example .env
   - Containerized LocalStack: `http://localstack:4566`
   - External LocalStack (Docker): `http://host.docker.internal:4566`
   - Local development: `http://localhost:4566`
+- `DYNAMODB_ENDPOINT` - LocalStack DynamoDB endpoint (same options as above)
 - `AWS_REGION` - AWS region (default: `us-east-1`)
 - `AWS_ACCESS_KEY_ID` - AWS credentials (default: `test`)
 - `AWS_SECRET_ACCESS_KEY` - AWS credentials (default: `test`)
@@ -328,7 +536,7 @@ make test-message            # Send a test message to a sample queue
 
 ## How It Works
 
-### Message Polling Strategy
+### SQS Message Polling Strategy
 
 The backend uses **long polling** to efficiently monitor SQS queues:
 
@@ -338,23 +546,60 @@ The backend uses **long polling** to efficiently monitor SQS queues:
    - `VisibilityTimeout=1` (messages quickly reappear)
    - `MaxNumberOfMessages=10`
 3. Each received message is broadcast to all connected WebSocket clients
-4. Messages are **never deleted** from the queue
+4. Messages are **never deleted** automatically (manual deletion available)
 
 This approach ensures:
 - Real-time updates with minimal latency
 - Low resource usage (long polling reduces API calls)
 - Non-destructive monitoring (messages remain in queue)
 
+### DynamoDB Item Management
+
+The DynamoDB service provides comprehensive table management:
+
+1. **List Tables**: Auto-refreshes every 10 seconds to show all tables with metadata
+2. **Scan Items**:
+   - Configurable limits (25/50/100/500 items per scan)
+   - Pagination support with `lastEvaluatedKey`
+   - "Load More" button for additional pages
+3. **CRUD Operations**:
+   - Create: JSON editor with required key validation
+   - Read: Expandable item cards with full JSON view
+   - Update: Edit items in place with JSON editor
+   - Delete: One-click deletion with confirmation
+4. **Schema Awareness**: Automatically detects and validates key attributes
+
 ## Future Enhancements
 
 This project is designed to be extensible. Planned features include:
 
-- Support for additional LocalStack services (DynamoDB, S3, Lambda, etc.)
+### SQS Enhancements
 - Message filtering and search
 - Queue metrics and statistics
-- Message replay and publishing from UI
 - Dead Letter Queue (DLQ) management
+- Batch operations
+
+### DynamoDB Enhancements
+- Query builder with index selection
+- Filter expressions
+- Batch import/export (CSV, JSON)
+- Table creation from UI
+- Global Secondary Index (GSI) management
+
+### New Services
+- **S3** - Bucket browsing, file upload/download
+- **Lambda** - Function invocation and log viewing
+- **SNS** - Topic management and subscription
+- **Kinesis** - Stream monitoring
+- **EventBridge** - Event rule management
+- **Step Functions** - Workflow visualization
+
+### General Improvements
 - Authentication and multi-user support
+- Role-based access control (RBAC)
+- Dark mode
+- Export/Import configurations
+- Service health monitoring
 
 ## Contributing
 
@@ -395,8 +640,9 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 If you encounter any issues or have questions:
 
 1. Check the [documentation](#api-documentation)
-2. Search existing [issues](https://github.com/yourusername/localstack-studio/issues)
-3. Create a new issue with detailed information
+2. Review the [Quick Start guide](#quick-start)
+3. Search existing [issues](https://github.com/yourusername/localstack-studio/issues)
+4. Create a new issue with detailed information
 
 ---
 

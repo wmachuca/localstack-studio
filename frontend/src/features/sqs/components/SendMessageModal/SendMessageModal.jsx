@@ -1,10 +1,12 @@
 import { useState } from 'react';
+import { useApp } from '../../../../context/AppContext';
 import './SendMessageModal.css';
 
 /**
  * Modal component for sending messages to a queue
  */
-export const SendMessageModal = ({ isOpen, onClose, queueName, backendUrl }) => {
+export const SendMessageModal = ({ isOpen, onClose, queueName }) => {
+  const { backendUrl } = useApp();
   const [messageBody, setMessageBody] = useState('');
   const [delaySeconds, setDelaySeconds] = useState(0);
   const [isSending, setIsSending] = useState(false);

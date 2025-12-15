@@ -25,6 +25,7 @@ services:
     environment:
       # Connect to external LocalStack container
       - SQS_ENDPOINT=${SQS_ENDPOINT:-http://${LOCALSTACK_CONTAINER_NAME:-localstack}:4566}
+      - DYNAMODB_ENDPOINT=${DYNAMODB_ENDPOINT:-http://${LOCALSTACK_CONTAINER_NAME:-localstack}:4566}
       - AWS_REGION=${AWS_REGION:-us-east-1}
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-test}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-test}

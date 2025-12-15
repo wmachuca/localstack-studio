@@ -27,9 +27,8 @@ const LOCALSTACK_SERVICES = [
     name: 'DynamoDB',
     fullName: 'DynamoDB',
     icon: '🗄️',
-    enabled: false,
-    description: 'NoSQL database service',
-    comingSoon: true
+    enabled: true,
+    description: 'NoSQL database service'
   },
   {
     id: 'lambda',

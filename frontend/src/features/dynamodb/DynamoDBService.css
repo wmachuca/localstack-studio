@@ -1,0 +1,22 @@
+.dynamodb-service {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.dynamodb-layout {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.table-list-panel {
+  width: 320px;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.item-viewer-panel {
+  flex: 1;
+  overflow: hidden;
+}
