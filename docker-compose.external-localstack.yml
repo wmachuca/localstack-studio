@@ -11,8 +11,6 @@
 #      docker-compose -f docker-compose.external-localstack.yml up -d
 #      OR use: make up-external-localstack
 
-version: '3.8'
-
 services:
   # Backend - FastAPI + WebSockets
   backend:
